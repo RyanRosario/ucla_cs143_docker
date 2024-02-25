@@ -54,9 +54,12 @@ RUN apt-get update -qq && \
 RUN sed -i 's/^#\(server\..*\.listen_address=:[0-9]\+\)$/\1/' /etc/neo4j/neo4j.conf
 RUN sed -i 's/^#\(server\..*\.advertised_address=:[0-9]\+\)$/\1/' /etc/neo4j/neo4j.conf
 RUN mkdir -p ~/shared/logs/neo4j
+RUN mkdir -p ~/data/neo4j
 RUN sed -i 's/server.directories.logs=\/var\/log\/neo4j/server.directories.logs=\/home\/cs143\/data\/logs\/neo4j/' /etc/neo4j/neo4j.conf
-RUN chmod -R 777 /var/lib/neo4j/run/
-
+RUN sed -i 's/server.directories.data=\/var\/lib\/neo4j\/data/server.directories.data=\/home\/cs143\/data\/neo4j/' /etc/neo4j/neo4j.conf
+RUN sed -i 's/#dbms.security.auth_enabled=false/dbms.security.auth_enabled=false/'  /etc/neo4j/neo4j.conf
+RUN sed -i 's/#server.default_listen_address=0.0.0.0/server.default_listen_address=0.0.0.0/' /etc/neo4j/neo4j.conf
+RUN chmod -R 777 /var/lib/neo4j/
     
 
 RUN pip3 install pymongo redis 
