@@ -37,6 +37,7 @@ RUN mkdir -p /var/lib/postgresql/16/main && \
     rm -rf /var/lib/postgresql/16/main/* && \
     su - postgres -c "/usr/lib/postgresql/16/bin/initdb -D /var/lib/postgresql/16/main"
 
+
 USER root
 RUN mkdir -p /docker-entrypoint-initdb.d
 
