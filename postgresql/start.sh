@@ -1,28 +1,29 @@
 #!/bin/bash
 set -e
 
-# Initialize PostgreSQL if $PGDATA is empty
-if [ -z "$(ls -A "$PGDATA")" ]; then
-    echo "Initializing PostgreSQL database cluster..."
-    /usr/lib/postgresql/16/bin/initdb -D "$PGDATA"
+# Initialize if needed
+if [ ! -f "$PGDATA/PG_VERSION" ]; then
+    initdb -D "$PGDATA"
 fi
 
-# Apply initialization scripts
-echo "Applying initialization scripts..."
-for f in /docker-entrypoint-initdb.d/*.sql; do
-    echo "Running $f..."
-    psql -U postgres -f "$f" || true
+# Start PostgreSQL
+postgres -D "$PGDATA" &
+PG_PID=$!
+
+# Wait for PostgreSQL to start
+until pg_isready; do
+    sleep 1
 done
 
-# Start PostgreSQL in the foreground
-echo "Starting PostgreSQL in foreground..."
-postgres -D "$PGDATA" &
-POSTGRES_PID=$!
+# Run initialization scripts
+for f in /docker-entrypoint-initdb.d/*.sql; do
+    if [ -f "$f" ]; then
+        echo "Running $f..."
+        psql -U postgres -f "$f"
+    fi
+done
 
-# Optional: Switch to cs143's shell
-echo "Switching to cs143's shell. Type 'exit' to leave the shell, but the container will keep running."
+# Switch to cs143
 su - cs143
 
-# Wait for PostgreSQL to stop
-wait $POSTGRES_PID
-
+wait $PG_PID
