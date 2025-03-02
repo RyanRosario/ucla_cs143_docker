@@ -9,75 +9,85 @@ LABEL edu.ucla.version="0.3.0"
 ENV TZ="America/Los_Angeles"
 
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
-RUN apt-get update -qq && \
-	DEBIAN_FRONTEND="noninteractive" TZ="America/Los_Angeles"  \
-        apt-get -yqq install --no-install-recommends -y gnupg2 wget lsb-release gpg \
-                python3 python3-pip python3-venv \
-                datamash dumb-init dos2unix emacs-nox gawk git gosu less lsof make man-db openssh-client psmisc \
-                python3-requests screen gosu tmux unzip vim-tiny wget zip \
-                && apt-get clean \
-                && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /root/.cache
+RUN apt update -qq && \
+	apt install -y gnupg curl lsb-release gpg wget curl nano software-properties-common dirmngr apt-transport-https gnupg2 ca-certificates ubuntu-keyring unzip python3 python3-pip && \
+        DEBIAN_FRONTEND="noninteractive" TZ="America/Los_Angeles" 
 
-ENV VIRTUAL_ENV=/opt/venv
-RUN python3 -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+# Install MongoDB
+RUN curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | \
+	gpg -o /usr/share/keyrings/mongodb-server-8.0.gpg \
+		--dearmor && \
+	echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" | \
+		tee /etc/apt/sources.list.d/mongodb-org-8.0.list && \
+	apt update && \
+	apt install -y mongodb-org && \
+	mkdir -p /home/cs143/.config/mongodb/data && \
+	mkdir -p /home/cs143/.config/mongodb/logs
 
-# MongoDB on Ubuntu
-RUN apt-get update -qq && \
-        DEBIAN_FRONTEND="noninteractive" TZ="America/Los_Angeles" \
-	apt-get -yqq install --no-install-recommends -y gnupg curl && \
-    curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | \
-    	gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor && \
-    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/7.0 multiverse" | \
-    tee /etc/apt/sources.list.d/mongodb-org-7.0.list && \
-    apt-get update && \
-    apt-get install -y mongodb-org && \
-    mkdir -p /data/db && \
-    chown -R mongodb:mongodb /data/db && \
-    curl -fsSL https://packages.redis.io/gpg  | \
-    gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg && \
-    echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | \
-    tee /etc/apt/sources.list.d/redis.list  && \
-    apt-get update && \
-    apt-get -yqq install --no-install-recommends -y redis && \ 
-    sed -i 's/bind 127.0.0.1/bind 0.0.0.0/' /etc/redis/redis.conf && \
-    sed -i 's/protected-mode yes/protected-mode no/' /etc/redis/redis.conf && \
-    chmod 777 /etc/redis/redis.conf
+# Install Redis
+RUN curl -fsSL https://packages.redis.io/gpg | gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg && \
+	chmod 644 /usr/share/keyrings/redis-archive-keyring.gpg && \
+	echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | \
+		tee /etc/apt/sources.list.d/redis.list && \
+	apt update && \
+	apt install -y redis
 
-RUN pip3 install pymongo redis
+# Install Neo4j
+RUN curl -fsSL https://debian.neo4j.com/neotechnology.gpg.key | \
+	gpg --dearmor -o /usr/share/keyrings/neo4j.gpg && \
+	echo "deb [signed-by=/usr/share/keyrings/neo4j.gpg] https://debian.neo4j.com stable latest" | \
+		tee -a /etc/apt/sources.list.d/neo4j.list && \
+	apt update && \
+	apt install -y neo4j
 
-RUN ln -fs "/usr/share/zoneinfo/America/Los_Angeles" /etc/localtime 
 
+# Set up user environment
 RUN useradd -s /bin/bash -g users -d /home/cs143 cs143   \
         && echo "cs143:cs143" | chpasswd  \
-        && mkdir -p /home/cs143  \
-        && mkdir -p /home/cs143/shared  \
-        && mkdir -p /home/cs143/data  \
-        && mkdir -p /home/cs143/data/logs  \
+        && mkdir -p /home/cs143/shared \
+        && mkdir -p /home/cs143/data \
         && chown -R cs143:users /home/cs143  \
         && echo "cs143 ALL=(ALL:ALL) ALL" >> /etc/sudoers  \
+        && chown cs143:users /etc/redis \
+        && chown -R cs143:users /home/cs143/shared \
+        && chown -R cs143:users /home/cs143/data \
         && apt-get update \
         && apt-get clean \
-	&& rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /root/.cache \
-        && chown cs143:users /etc/redis \
-	&& chown cs143:users /home/cs143/shared \
-	&& chown cs143:users /home/cs143/data \
-	&& chown cs143:users /home/cs143/data/logs
+        && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /root/.cache 
 
-RUN pip3 install ipython \
+RUN mkdir -p /home/cs143/.config/neo4j \
+	&& chown -R cs143:users /home/cs143/.config/neo4j \
+	&& chmod -R 755 /home/cs143/.config/neo4j \
+	&& sed -i 's|/var/lib/|/home/cs143/.config/neo4j/|g' /etc/neo4j/neo4j.conf \
+	&& sed -i 's|#server.directories.run=.*|server.directories.run=/home/cs143/.config/neo4j/run|' /etc/neo4j/neo4j.conf \
+	&& sed -i 's|server.directories.logs=/var/log/neo4j|server.directories.logs=/home/cs143/.config/neo4j/log/neo4j|' /etc/neo4j/neo4j.conf \
+	&& sed -i 's|#dbms.security.auth_enabled=false|dbms.security.auth_enabled=false|' /etc/neo4j/neo4j.conf
+
+# Install drivers
+RUN pip install  --break-system-packages pymongo redis neo4j ipython \
         && ln -s /usr/bin/python3 /usr/bin/python \
         && echo "alias ipython='python -m IPython'" >/home/cs143/.bashrc \
         && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /root/.cache
- 
+
 RUN apt autoremove --yes
 
 VOLUME [ "/home/cs143/shared" ]
 VOLUME [ "/home/cs143/data" ]
 
+# Expose necessary ports
 EXPOSE 27017
+EXPOSE 7474
+EXPOSE 7687
+
+COPY entrypoint.sh /home/cs143/.config/entrypoint.sh
+
+# Ensure the script is executable
+RUN chmod +x /home/cs143/.config/entrypoint.sh
+
+# Set user and working directory
 USER cs143
 WORKDIR /home/cs143
-CMD mongod --dbpath /home/cs143/data --logpath /home/cs143/data/mongo.log --bind_ip_all --fork -f /etc/mongod.conf >> /dev/null && \
-  redis-server --protected-mode no --daemonize yes >> /dev/null  && \
-  /bin/bash
 
+
+ENTRYPOINT ["/home/cs143/.config/entrypoint.sh"]
+CMD ["bash"]
