@@ -1,9 +1,5 @@
 #!/bin/bash
 
-# TODO:
-# Check connectivity from outside container
-# Prevent Neo4j from asking for username
-
 # --- Check & Start MongoDB ---
 if pgrep -x "mongod" > /dev/null; then
     echo "MongoDB is already running!"

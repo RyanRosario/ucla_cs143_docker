@@ -1,10 +1,10 @@
 FROM ubuntu:latest
 
 CMD ["bash"]
-LABEL image="CS 143 Winter 2024 NoSQL"
+LABEL image="CS 143 NoSQL"
 LABEL maintainer="rrosario@cs.ucla.edu"
 LABEL vendor="UCLA Computer Science"
-LABEL edu.ucla.version="0.3.0"
+LABEL edu.ucla.version="0.4.0"
 
 ENV TZ="America/Los_Angeles"
 
